@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Administrador</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    form { margin: 20px 0; }
+    input { margin: 5px; padding: 8px; }
+    button { padding: 8px 12px; background: #007bff; color: white; border: none; cursor: pointer; }
+    .logout { background: #dc3545; }
+  </style>
+</head>
+<body>
+
+<h1>Bienvenido</h1>
+  <h1>Panel de Administrador</h1>
+
+  <!-- Profile Picture Section -->
+  <h2>Foto de Perfil</h2>
+  <% if (profilePicture) { %>
+    <img src="/uploads/<%= profilePicture %>" alt="Foto de perfil" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover;">
+    <form action="/delete-profile-picture" method="POST" style="display:inline;">
+      <button type="submit" onclick="return confirm('¿Eliminar foto de perfil?')">Eliminar Foto</button>
+    </form>
+  <% } else { %>
+    <p>No tienes foto de perfil</p>
+  <% } %>
+
+  <form action="/upload-profile-picture" method="POST" enctype="multipart/form-data">
+    <input type="file" name="profilePicture" accept="image/*" required>
+    <button type="submit">Subir Foto</button>
+  </form>
+  <h2>Todas las Reservaciones</h2>
+
+  <table>
+    <tr>
+      <th>Foto</th>
+      <th>Usuario</th>
+      <th>Fecha</th>
+      <th>Hora</th>
+      <th>Mesa</th>
+      <th>Acciones</th>
+    </tr>
+
+    <% if (reservations && reservations.length > 0) { %>
+      <% reservations.forEach(reservation => { %>
+        <tr>
+          <td>
+            <% if (reservation.user_id && reservation.user_id.profile_picture) { %>
+              <img src="/uploads/<%= reservation.user_id.profile_picture %>" alt="Foto de perfil" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+            <% } else { %>
+              <img src="/uploads/default-profile.png" alt="Sin foto" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+            <% } %>
+          </td>
+          <td><%= reservation.user_id ? reservation.user_id.username : 'Usuario desconocido' %></td>
+          <td><%= reservation.date %></td>
+          <td><%= reservation.time %></td>
+          <td><%= reservation.table_number %></td>
+          <td>
+            <form action="/edit-reservation/<%= reservation._id %>" method="POST" style="display:inline;">
+              <input type="date" name="date" value="<%= reservation.fecha || reservation.date %>" required>
+              <input type="time" name="time" value="<%= reservation.hora || reservation.time %>" required>
+              <input type="number" name="table" value="<%= reservation.tableId || reservation.table_number %>" required>
+              <button type="submit">Editar</button>
+            </form>
+
+            <form action="/delete-reservation/<%= reservation._id %>" method="POST" style="display:inline;">
+              <button type="submit" onclick="return confirm('¿Eliminar reservación?')">Eliminar</button>
+            </form>
+
+            <button onclick="markFree('<%= reservation._id %>')">Marcar Libre</button>
+          </td>
+        </tr>
+      <% }); %>
+    <% } else { %>
+      <tr><td colspan="6">No hay reservaciones registradas.</td></tr>
+    <% } %>
+
+  </table>
+
+  <h2>Buscar Reservaciones por Usuario</h2>
+  <form action="/search-reservations" method="GET">
+    <input type="text" name="username" placeholder="Nombre de usuario">
+    <button type="submit">Buscar</button>
+  </form>
+
+  <form action="/logout" method="POST">
+    <button type="submit" class="logout">Cerrar Sesión</button>
+  </form>
+
+  <script>
+    function markFree(id) {
+      if (confirm('¿Marcar mesa como libre?')) {
+        fetch('/delete-reservation/' + id, { method: 'POST' })
+          .then(() => location.reload());
+      }
+    }
+  </script>
+
+</body>
+</html>

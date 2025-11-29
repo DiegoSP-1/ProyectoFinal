@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Usuario - <%= username %></title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    form { margin: 20px 0; }
+    input { margin: 5px; padding: 8px; }
+    button { padding: 8px 12px; background: #007bff; color: white; border: none; cursor: pointer; }
+    .logout { background: #dc3545; }
+  </style>
+</head>
+<body>
+  <h1>Bienvenido, <%= username %></h1>
+
+  <!-- Profile Picture Section -->
+  <h2>Foto de Perfil</h2>
+  <% if (profilePicture) { %>
+    <img src="/uploads/<%= profilePicture %>" alt="Foto de perfil" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover;">
+    <form action="/delete-profile-picture" method="POST" style="display:inline;">
+      <button type="submit" onclick="return confirm('¿Eliminar foto de perfil?')">Eliminar Foto</button>
+    </form>
+  <% } else { %>
+    <p>No tienes foto de perfil</p>
+  <% } %>
+
+  <form action="/upload-profile-picture" method="POST" enctype="multipart/form-data">
+    <input type="file" name="profilePicture" accept="image/*" required>
+    <button type="submit">Subir Foto</button>
+  </form>
+
+  <h2>Tus Reservaciones</h2>
+  <table>
+    <tr>
+      <th>Fecha</th>
+      <th>Hora</th>
+      <th>Mesa</th>
+      <th>Acciones</th>
+    </tr>
+    <% reservations.forEach(reservation => { %>
+      <tr>
+        <td><%= reservation.fecha %></td>
+        <td><%= reservation.hora %></td>
+        <td><%= reservation.tableId %></td>
+        <td>
+          <form action="/edit-reservation/<%= reservation._id %>" method="POST" style="display:inline;">
+            <input type="date" name="date" value="<%= reservation.fecha %>" required>
+            <input type="time" name="time" value="<%= reservation.hora %>" required>
+            <input type="number" name="table" value="<%= reservation.tableId %>" required>
+            <button type="submit">Editar</button>
+          </form>
+          <form action="/delete-reservation/<%= reservation._id %>" method="POST" style="display:inline;">
+            <button type="submit" onclick="return confirm('¿Eliminar reservación?')">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </table>
+
+  <h2>Hacer Nueva Reservación</h2>
+  <form id="reserveForm">
+    <label>Fecha:</label>
+    <input type="date" name="date" id="date" required onchange="loadFreeTimes()">
+    <label>Hora:</label>
+    <select name="time" id="time" required onchange="toggleCustomTime()">
+      <option value="">Selecciona una hora</option>
+      <option value="custom">Otra hora</option>
+    </select>
+    <div id="customTimeDiv" style="display:none;">
+      <label>Otra hora:</label>
+      <input type="time" name="customTime" id="customTime">
+    </div>
+    <label>Mesa:</label>
+    <input type="number" name="table" placeholder="Número de mesa" required>
+    <button type="submit">Reservar</button>
+  </form>
+  <div id="message"></div>
+
+  <script>
+    function loadFreeTimes() {
+      const date = document.getElementById('date').value;
+      if (!date) return;
+      fetch(`/free-times?date=${date}`)
+        .then(response => response.json())
+        .then(times => {
+          const select = document.getElementById('time');
+          select.innerHTML = '<option value="">Selecciona una hora</option>';
+          times.forEach(time => {
+            const option = document.createElement('option');
+            option.value = time;
+            option.textContent = time;
+            select.appendChild(option);
+          });
+          select.appendChild(new Option('Otra hora', 'custom'));
+        });
+    }
+
+    function toggleCustomTime() {
+      const timeSelect = document.getElementById('time');
+      const customDiv = document.getElementById('customTimeDiv');
+      if (timeSelect.value === 'custom') {
+        customDiv.style.display = 'block';
+        document.getElementById('customTime').required = true;
+      } else {
+        customDiv.style.display = 'none';
+        document.getElementById('customTime').required = false;
+      }
+    }
+
+    document.getElementById('reserveForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const timeSelect = document.getElementById('time');
+      let timeValue = timeSelect.value;
+      if (timeValue === 'custom') {
+        timeValue = document.getElementById('customTime').value;
+      }
+      const date = form.date.value;
+      const table = form.table.value;
+
+      // Validación del lado del cliente
+      if (!date) {
+        document.getElementById('message').innerText = 'Por favor selecciona una fecha.';
+        return;
+      }
+      if (!timeValue) {
+        document.getElementById('message').innerText = 'Por favor selecciona una hora.';
+        return;
+      }
+      if (!table || isNaN(parseInt(table)) || parseInt(table) <= 0) {
+        document.getElementById('message').innerText = 'Por favor ingresa un número de mesa válido.';
+        return;
+      }
+
+      const data = {
+        date: date,
+        time: timeValue,
+        table: table
+      };
+      fetch('/reserve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data) {
+          document.getElementById('message').innerText = data.message;
+          if (data.success) {
+            loadFreeTimes(); // Recargar horas disponibles
+            location.reload(); // Recargar página para mostrar nueva reservación
+          }
+        }
+      })
+      .catch(err => {
+        document.getElementById('message').innerText = 'Error de conexión.';
+      });
+    });
+  </script>
+
+  <form action="/logout" method="POST">
+    <button type="submit" class="logout">Cerrar Sesión</button>
+  </form>
+</body>
+</html>
